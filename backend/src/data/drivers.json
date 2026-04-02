@@ -1,0 +1,8 @@
+{
+  "drivers": [
+    { "id": "drv_1", "name": "Chauffeur 1", "phone": "+33600000001" },
+    { "id": "drv_2", "name": "Chauffeur 2", "phone": "+33600000002" },
+    { "id": "drv_3", "name": "Chauffeur 3", "phone": "+33600000003" }
+  ]
+}
+

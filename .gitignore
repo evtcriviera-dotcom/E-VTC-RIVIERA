@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+.vite/
+
+# runtime data (optional: keep requests in repo if you want)
+backend/src/data/*.tmp
+
+# OS/editor
+.DS_Store
+Thumbs.db
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+

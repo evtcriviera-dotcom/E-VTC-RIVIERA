@@ -1,0 +1,13 @@
+{
+  "name": "e-vtc-riviera",
+  "private": true,
+  "version": "0.1.0",
+  "description": "E VTC Riviera - app web de gestion VTC (devis, dispatch, admin).",
+  "scripts": {
+    "dev": "npm run dev:backend",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend run start"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "requests": [
+    {
+      "id": "req_b4710f698cd078_19d4d632267",
+      "createdAt": "2026-04-02T08:50:35.751Z",
+      "client": {
+        "name": "Test",
+        "phone": "0780390730",
+        "email": ""
+      },
+      "trip": {
+        "date": "2026-04-02",
+        "time": "10:00",
+        "dateTimeIso": "2026-04-02T08:00:00.000Z",
+        "fromAddress": "Nice",
+        "toAddress": "Cannes",
+        "passengers": 1,
+        "bagages": 2,
+        "vehicleType": "BERLINE",
+        "km": 12
+      },
+      "pricing": {
+        "priceEur": 30,
+        "computedPriceEur": 30,
+        "breakdown": {
+          "vehicleType": "BERLINE",
+          "perKmCents": 200,
+          "baseCents": 2400,
+          "night": false,
+          "weekend": false,
+          "urgent": false,
+          "minApplied": true,
+          "steps": [
+            {
+              "label": "Prix minimum",
+              "factor": null,
+              "deltaEur": 6,
+              "fromEur": 24,
+              "toEur": 30
+            }
+          ],
+          "finalEur": 30
+        }
+      },
+      "status": "CONFIRME",
+      "dispatch": {
+        "sentAt": null,
+        "assignedDriverId": null,
+        "acceptedAt": null,
+        "confirmedAt": "2026-04-02T08:50:35.765Z"
+      }
+    }
+  ]
+}
