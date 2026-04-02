@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api, waLink } from "../api.js";
-import { formatEur } from "../utils.js";
+import { estimateKmFromAddresses } from "../distance.js";
 
 const COMPANY_WHATSAPP = "0780390730";
 
@@ -36,9 +36,12 @@ export default function ClientRequestPage() {
     km: ""
   });
 
-  const [quote, setQuote] = useState(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
-  const [quoteError, setQuoteError] = useState("");
+  const [distanceState, setDistanceState] = useState({
+    status: "idle", // idle | loading | ok | error
+    message: ""
+  });
+  const kmTouchedRef = useRef(false);
+  const lastAutoKeyRef = useRef("");
 
   const [submitted, setSubmitted] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -46,64 +49,130 @@ export default function ClientRequestPage() {
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const canAutoQuote =
-    Boolean(form.date) &&
-    Boolean(form.time) &&
-    Boolean(form.vehicleType) &&
-    form.fromAddress.trim().length > 2 &&
-    form.toAddress.trim().length > 2;
+  // Auto-distance (frontend-only): Nominatim -> OSRM
+  useEffect(() => {
+    const from = form.fromAddress.trim();
+    const to = form.toAddress.trim();
+    const canAuto = from.length > 2 && to.length > 2;
+
+    if (!canAuto) {
+      setDistanceState({ status: "idle", message: "" });
+      lastAutoKeyRef.current = "";
+      return;
+    }
+
+    const key = `${from}__${to}`;
+    if (key === lastAutoKeyRef.current) return;
+
+    const controller = new AbortController();
+    setDistanceState({ status: "loading", message: "Calcul de distance..." });
+
+    const t = setTimeout(async () => {
+      try {
+        const km = await estimateKmFromAddresses({
+          fromAddress: from,
+          toAddress: to,
+          signal: controller.signal
+        });
+        const km1 = Math.round(km * 10) / 10;
+
+        lastAutoKeyRef.current = key;
+        setDistanceState({ status: "ok", message: `Distance calculée: ${km1} km` });
+
+        // Fill the input unless user manually changed it.
+        if (!kmTouchedRef.current) {
+          setForm((f) => ({ ...f, km: String(km1).replace(".", ",") }));
+        }
+      } catch (e) {
+        if (controller.signal.aborted) return;
+        setDistanceState({
+          status: "error",
+          message: "Distance automatique indisponible, saisissez-la manuellement"
+        });
+      }
+    }, 650);
+
+    return () => {
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [form.fromAddress, form.toAddress]);
+
+  // If addresses change after manual km edit, allow auto-fill again.
+  useEffect(() => {
+    kmTouchedRef.current = false;
+  }, [form.fromAddress, form.toAddress]);
+
+  const pricing = useMemo(() => {
+    const vehicleLabel = form.vehicleType === "VAN" ? "Van" : "Berline";
+    const vehicleRate = form.vehicleType === "VAN" ? 3.4 : 2.4;
+
+    const kmRaw = String(form.km ?? "").trim().replace(",", ".");
+    const km = Number(kmRaw);
+    const hasKm = Number.isFinite(km) && km > 0;
+
+    // Distance is the mandatory input for a precise quote in the frontend.
+    if (!hasKm) {
+      return {
+        ready: false,
+        message: "Renseignez la distance pour obtenir un devis précis"
+      };
+    }
+
+    if (!form.date || !form.time || !form.vehicleType) {
+      return {
+        ready: false,
+        message: "Complétez les informations pour calculer votre devis"
+      };
+    }
+
+    const dt = new Date(`${form.date}T${form.time}:00`);
+    if (Number.isNaN(dt.getTime())) {
+      return {
+        ready: false,
+        message: "Complétez les informations pour calculer votre devis"
+      };
+    }
+
+    const hour = dt.getHours();
+    const day = dt.getDay(); // 0=Sun..6=Sat
+    const night = hour >= 22 || hour < 6;
+    const weekend = day === 0 || day === 6;
+    const urgency = Boolean(form.urgency);
+
+    let price = km * vehicleRate;
+    if (night) price *= 1.2;
+    if (weekend) price *= 1.1;
+    if (urgency) price *= 1.15;
+
+    price = Math.max(price, 30);
+    const priceFinalTTC = Math.ceil(price); // round up to the next euro
+
+    const distanceUsed = Math.round(km * 10) / 10;
+
+    return {
+      ready: true,
+      message: "",
+      distanceUsed,
+      vehicleLabel,
+      vehicleRate,
+      night,
+      weekend,
+      urgency,
+      priceFinalTTC
+    };
+  }, [form.date, form.time, form.vehicleType, form.km, form.urgency]);
 
   const canSubmit =
     form.name.trim() &&
     form.phone.trim() &&
-    canAutoQuote;
+    form.date &&
+    form.time &&
+    form.fromAddress.trim().length > 2 &&
+    form.toAddress.trim().length > 2 &&
+    form.vehicleType;
 
-  const canReserve = canSubmit && !quoteLoading && Boolean(quote);
-
-  const quoteSeq = useRef(0);
-
-  async function fetchQuote() {
-    const seq = ++quoteSeq.current;
-    setQuoteError("");
-    setQuoteLoading(true);
-    try {
-      const km =
-        form.km.trim() === "" ? undefined : Number(String(form.km).replace(",", "."));
-      const r = await api.quote({
-        date: form.date,
-        time: form.time,
-        fromAddress: form.fromAddress,
-        toAddress: form.toAddress,
-        passengers: Number(form.passengers) || 1,
-        urgency: Boolean(form.urgency),
-        vehicleType: form.vehicleType,
-        km
-      });
-      if (seq !== quoteSeq.current) return;
-      setQuote(r);
-    } catch (_e) {
-      if (seq !== quoteSeq.current) return;
-      setQuote(null);
-      setQuoteError("Impossible de calculer le devis pour le moment.");
-    } finally {
-      if (seq === quoteSeq.current) setQuoteLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!canAutoQuote) {
-      setQuote(null);
-      setQuoteError("");
-      setQuoteLoading(false);
-      return;
-    }
-
-    const t = setTimeout(() => {
-      fetchQuote();
-    }, 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canAutoQuote, form.date, form.time, form.fromAddress, form.toAddress, form.vehicleType, form.km, form.urgency]);
+  const canReserve = Boolean(canSubmit && pricing.ready);
 
   async function onSubmit() {
     setSubmitError("");
@@ -113,8 +182,8 @@ export default function ClientRequestPage() {
         ...form,
         passengers: Number(form.passengers) || 1,
         bagages: Number(form.bagages) || 0,
-        km: quote?.km ?? (Number(form.km) || 0),
-        priceEur: quote?.priceEur
+        km: pricing.ready ? pricing.distanceUsed : Number(form.km) || 0,
+        priceEur: pricing.ready ? pricing.priceFinalTTC : undefined
       };
       const r = await api.createRequest(payload);
       setSubmitted(r.request);
@@ -126,23 +195,28 @@ export default function ClientRequestPage() {
   }
 
   const clientWaText = useMemo(() => {
-    const vehicleLabel = form.vehicleType === "VAN" ? "Van" : "Berline";
-    const priceLabel = quote?.priceEur != null ? `${quote.priceEur} €` : "à confirmer";
-    const trajet = `${form.fromAddress} → ${form.toAddress}`;
+    if (!pricing.ready) return "";
+
+    const distanceStr = `${pricing.distanceUsed} km`;
+    const priceStr = `${pricing.priceFinalTTC} €`;
 
     return [
       "Bonjour, je souhaite réserver un transport :",
+      `Nom : ${form.name}`,
+      `Téléphone : ${form.phone}`,
       `Date : ${form.date}`,
       `Heure : ${form.time}`,
       `Départ : ${form.fromAddress}`,
       `Arrivée : ${form.toAddress}`,
       `Passagers : ${form.passengers}`,
-      `Véhicule : ${vehicleLabel}`,
-      `Prix estimé : ${priceLabel}`,
+      `Bagages : ${form.bagages}`,
+      `Véhicule : ${pricing.vehicleLabel}`,
+      `Distance : ${distanceStr}`,
+      `Prix estimé : ${priceStr}`,
       "",
       "Merci de confirmer la disponibilité."
     ].join("\n");
-  }, [form, quote]);
+  }, [form, pricing]);
 
   return (
     <div className="stack">
@@ -152,14 +226,23 @@ export default function ClientRequestPage() {
         <div className="heroPrice">
           <div className="heroPriceLabel">Prix</div>
           <div className="heroPriceValue">
-            {quote && !quoteLoading ? formatEur(quote.priceEur) : quoteLoading ? "Calcul en cours..." : "—"}
+            {pricing.ready ? `${pricing.priceFinalTTC} €` : pricing.message}
           </div>
           <div className="heroPriceMeta">
-            {quote && !quoteLoading
-              ? quote.kmSource === "google"
-                ? `Distance réelle: ${quote.km} km`
-                : `Distance: ${quote.km} km`
-              : ""}
+            {pricing.ready ? (
+              <div>
+                <div>Distance utilisée : {pricing.distanceUsed} km</div>
+                <div>
+                  Tarif véhicule : {pricing.vehicleRate} €/km ({pricing.vehicleLabel})
+                </div>
+                <div>Majoration nuit : {pricing.night ? "Oui" : "Non"}</div>
+                <div>Majoration week-end : {pricing.weekend ? "Oui" : "Non"}</div>
+                <div>Majoration urgence : {pricing.urgency ? "Oui" : "Non"}</div>
+                <div style={{ marginTop: 6 }}>
+                  Prix final TTC : <b style={{ color: "var(--gold2)" }}>{pricing.priceFinalTTC} €</b>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -227,13 +310,29 @@ export default function ClientRequestPage() {
           </label>
 
           <label className="field">
-            <div className="label">Distance (option)</div>
+            <div className="label">Distance (km)</div>
             <input
               inputMode="decimal"
-              placeholder="Auto si vide"
+              placeholder="Ex: 12,5"
               value={form.km}
-              onChange={(e) => update("km", e.target.value)}
+              onChange={(e) => {
+                kmTouchedRef.current = true;
+                update("km", e.target.value);
+              }}
             />
+            {distanceState.status === "loading" ? (
+              <div className="muted" style={{ marginTop: 6 }}>
+                Calcul de distance...
+              </div>
+            ) : distanceState.status === "error" ? (
+              <div className="muted" style={{ marginTop: 6 }}>
+                {distanceState.message}
+              </div>
+            ) : distanceState.status === "ok" ? (
+              <div className="muted" style={{ marginTop: 6 }}>
+                {distanceState.message}
+              </div>
+            ) : null}
           </label>
 
           <label className="field" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -266,49 +365,9 @@ export default function ClientRequestPage() {
           </button>
         </div>
 
-        {quoteError ? <div className="alert error">{quoteError}</div> : null}
         {submitted ? (
           <div className="alert ok" style={{ marginTop: 10 }}>
             Demande envoyée. Référence: <b>{submitted.id}</b>
-          </div>
-        ) : null}
-
-        {quote ? (
-          <div className="quoteBox" style={{ marginTop: 12 }}>
-            <div className="quoteLabel">Détails du devis</div>
-            <div className="quoteMeta" style={{ marginTop: 6 }}>
-              Distance: <b style={{ color: "var(--gold2)" }}>{quote.km} km</b> • Prix final:{" "}
-              <b style={{ color: "var(--gold2)" }}>{formatEur(quote.priceEur)}</b>
-            </div>
-            {quote.breakdown ? (
-              <div className="quoteBreakdown">
-                <div className="breakRow">
-                  <span>Base</span>
-                  <b style={{ color: "var(--gold2)" }}>
-                    {(quote.breakdown.baseCents / 100).toFixed(2).replace(".", ",")} €
-                  </b>
-                </div>
-                {quote.breakdown.steps.length > 0 ? (
-                  quote.breakdown.steps.map((s, i) => (
-                    <div key={`${s.label}_${i}`} className="breakRow">
-                      <span>{s.label}</span>
-                      <b style={{ color: "var(--gold2)" }}>
-                        {s.deltaEur >= 0
-                          ? `+${s.deltaEur.toFixed(2).replace(".", ",")} €`
-                          : `${s.deltaEur.toFixed(2).replace(".", ",")} €`}
-                      </b>
-                    </div>
-                  ))
-                ) : (
-                  <div className="breakNote">Aucun coefficient appliqué.</div>
-                )}
-              </div>
-            ) : null}
-          </div>
-        ) : quoteLoading ? (
-          <div className="quoteBox" style={{ marginTop: 12 }}>
-            <div className="quoteLabel">Détails du devis</div>
-            <div className="quoteMeta">Calcul en cours...</div>
           </div>
         ) : null}
         {submitError ? <div className="alert error">{submitError}</div> : null}
