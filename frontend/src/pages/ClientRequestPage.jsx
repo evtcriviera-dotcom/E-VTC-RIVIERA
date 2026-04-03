@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { api, waLink } from "../api.js";
+import { waLink } from "../api.js";
 import { estimateKmFromAddresses } from "../distance.js";
 
 const COMPANY_WHATSAPP = "0780390730";
@@ -43,8 +43,7 @@ export default function ClientRequestPage() {
   const kmTouchedRef = useRef(false);
   const lastAutoKeyRef = useRef("");
 
-  const [submitted, setSubmitted] = useState(null);
-  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -174,36 +173,16 @@ export default function ClientRequestPage() {
 
   const canReserve = Boolean(canSubmit && pricing.ready);
 
-  async function onSubmit() {
-    setSubmitError("");
-    setSubmitLoading(true);
-    try {
-      const payload = {
-        ...form,
-        passengers: Number(form.passengers) || 1,
-        bagages: Number(form.bagages) || 0,
-        km: pricing.ready ? pricing.distanceUsed : Number(form.km) || 0,
-        priceEur: pricing.ready ? pricing.priceFinalTTC : undefined
-      };
-      const r = await api.createRequest(payload);
-      setSubmitted(r.request);
-    } catch (e) {
-      setSubmitError("Erreur lors de l’envoi. Vérifie les champs puis réessaie.");
-    } finally {
-      setSubmitLoading(false);
-    }
-  }
-
-  const clientWaText = useMemo(() => {
+  const quoteWaText = useMemo(() => {
     if (!pricing.ready) return "";
-
     const distanceStr = `${pricing.distanceUsed} km`;
     const priceStr = `${pricing.priceFinalTTC} €`;
 
     return [
-      "Bonjour, je souhaite réserver un transport :",
+      "Bonjour, je souhaite obtenir un devis pour un transport :",
       `Nom : ${form.name}`,
       `Téléphone : ${form.phone}`,
+      `Email : ${form.email || "-"}`,
       `Date : ${form.date}`,
       `Heure : ${form.time}`,
       `Départ : ${form.fromAddress}`,
@@ -214,9 +193,54 @@ export default function ClientRequestPage() {
       `Distance : ${distanceStr}`,
       `Prix estimé : ${priceStr}`,
       "",
-      "Merci de confirmer la disponibilité."
+      "Merci de me confirmer ce devis."
     ].join("\n");
   }, [form, pricing]);
+
+  const reserveWaText = useMemo(() => {
+    if (!pricing.ready) return "";
+    const distanceStr = `${pricing.distanceUsed} km`;
+    const priceStr = `${pricing.priceFinalTTC} €`;
+
+    return [
+      "Bonjour, je souhaite confirmer cette réservation :",
+      `Nom : ${form.name}`,
+      `Téléphone : ${form.phone}`,
+      `Email : ${form.email || "-"}`,
+      `Date : ${form.date}`,
+      `Heure : ${form.time}`,
+      `Départ : ${form.fromAddress}`,
+      `Arrivée : ${form.toAddress}`,
+      `Passagers : ${form.passengers}`,
+      `Bagages : ${form.bagages}`,
+      `Véhicule : ${pricing.vehicleLabel}`,
+      `Distance : ${distanceStr}`,
+      `Prix estimé : ${priceStr}`,
+      "",
+      "Je souhaite confirmer cette réservation.",
+      "Merci de me confirmer la disponibilité."
+    ].join("\n");
+  }, [form, pricing]);
+
+  function handleReserveClick() {
+    // Validation champs essentiels avant d'ouvrir WhatsApp
+    if (!canSubmit || !pricing.ready) {
+      setSubmitError("Complétez les informations pour confirmer votre réservation.");
+      return;
+    }
+
+    setSubmitError("");
+    setSubmitted(false);
+
+    const msg = reserveWaText;
+    if (!msg) {
+      setSubmitError("Impossible de préparer le message de réservation. Vérifiez les champs.");
+      return;
+    }
+
+    window.open(waLink(COMPANY_WHATSAPP, msg), "_blank", "noreferrer");
+    setSubmitted(true);
+  }
 
   return (
     <div className="stack">
@@ -351,14 +375,14 @@ export default function ClientRequestPage() {
         </div>
 
         <div className="actions">
-          <button className="btn gold" disabled={!canReserve || submitLoading} onClick={onSubmit}>
-            {submitLoading ? "Réservation..." : "Réserver maintenant"}
+          <button className="btn gold" disabled={!canReserve} onClick={handleReserveClick}>
+            Réserver maintenant
           </button>
           <button
             className="btn ghost"
-            disabled={!canReserve || !clientWaText}
+            disabled={!canReserve || !quoteWaText}
             onClick={() => {
-              window.open(waLink(COMPANY_WHATSAPP, clientWaText), "_blank", "noreferrer");
+              window.open(waLink(COMPANY_WHATSAPP, quoteWaText), "_blank", "noreferrer");
             }}
           >
             Recevoir le devis sur WhatsApp
@@ -367,7 +391,7 @@ export default function ClientRequestPage() {
 
         {submitted ? (
           <div className="alert ok" style={{ marginTop: 10 }}>
-            Demande envoyée. Référence: <b>{submitted.id}</b>
+            Votre message de réservation est prêt dans WhatsApp.
           </div>
         ) : null}
         {submitError ? <div className="alert error">{submitError}</div> : null}
