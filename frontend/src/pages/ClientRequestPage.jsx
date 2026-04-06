@@ -104,7 +104,7 @@ export default function ClientRequestPage() {
 
   const pricing = useMemo(() => {
     const vehicleLabel = form.vehicleType === "VAN" ? "Van" : "Berline";
-    const vehicleRate = form.vehicleType === "VAN" ? 3.4 : 2.4;
+    const vehicleRate = form.vehicleType === "VAN" ? 3 : 2;
 
     const kmRaw = String(form.km ?? "").trim().replace(",", ".");
     const km = Number(kmRaw);
