@@ -29,9 +29,11 @@ export default function ClientRequestPage() {
     time: toTimeValue(now),
     fromAddress: "",
     toAddress: "",
-    passengers: 1,
+    adults: 1,
+    children: 0,
     bagages: 0,
-    urgency: false,
+    babySeat: false,
+    booster: false,
     vehicleType: "BERLINE",
     km: ""
   });
@@ -102,6 +104,13 @@ export default function ClientRequestPage() {
     kmTouchedRef.current = false;
   }, [form.fromAddress, form.toAddress]);
 
+  const totalPassengers = useMemo(() => {
+    const a = Number(form.adults);
+    const c = Number(form.children);
+    const total = (Number.isFinite(a) ? a : 0) + (Number.isFinite(c) ? c : 0);
+    return total > 0 ? total : 1;
+  }, [form.adults, form.children]);
+
   const pricing = useMemo(() => {
     const vehicleLabel = form.vehicleType === "VAN" ? "Van" : "Berline";
     const vehicleRate = form.vehicleType === "VAN" ? 3 : 2;
@@ -137,12 +146,10 @@ export default function ClientRequestPage() {
     const day = dt.getDay(); // 0=Sun..6=Sat
     const night = hour >= 22 || hour < 6;
     const weekend = day === 0 || day === 6;
-    const urgency = Boolean(form.urgency);
 
     let price = km * vehicleRate;
     if (night) price *= 1.2;
     if (weekend) price *= 1.1;
-    if (urgency) price *= 1.15;
 
     price = Math.max(price, 30);
     const priceFinalTTC = Math.ceil(price); // round up to the next euro
@@ -157,10 +164,9 @@ export default function ClientRequestPage() {
       vehicleRate,
       night,
       weekend,
-      urgency,
       priceFinalTTC
     };
-  }, [form.date, form.time, form.vehicleType, form.km, form.urgency]);
+  }, [form.date, form.time, form.vehicleType, form.km]);
 
   const canSubmit =
     form.name.trim() &&
@@ -187,8 +193,12 @@ export default function ClientRequestPage() {
       `Heure : ${form.time}`,
       `Départ : ${form.fromAddress}`,
       `Arrivée : ${form.toAddress}`,
-      `Passagers : ${form.passengers}`,
+      `Adultes : ${form.adults}`,
+      `Enfants : ${form.children}`,
+      `Passagers (total) : ${totalPassengers}`,
       `Bagages : ${form.bagages}`,
+      `Siège bébé : ${form.babySeat ? "Oui" : "Non"}`,
+      `Rehausseur : ${form.booster ? "Oui" : "Non"}`,
       `Véhicule : ${pricing.vehicleLabel}`,
       `Distance : ${distanceStr}`,
       `Prix estimé : ${priceStr}`,
@@ -211,8 +221,12 @@ export default function ClientRequestPage() {
       `Heure : ${form.time}`,
       `Départ : ${form.fromAddress}`,
       `Arrivée : ${form.toAddress}`,
-      `Passagers : ${form.passengers}`,
+      `Adultes : ${form.adults}`,
+      `Enfants : ${form.children}`,
+      `Passagers (total) : ${totalPassengers}`,
       `Bagages : ${form.bagages}`,
+      `Siège bébé : ${form.babySeat ? "Oui" : "Non"}`,
+      `Rehausseur : ${form.booster ? "Oui" : "Non"}`,
       `Véhicule : ${pricing.vehicleLabel}`,
       `Distance : ${distanceStr}`,
       `Prix estimé : ${priceStr}`,
@@ -261,7 +275,6 @@ export default function ClientRequestPage() {
                 </div>
                 <div>Majoration nuit : {pricing.night ? "Oui" : "Non"}</div>
                 <div>Majoration week-end : {pricing.weekend ? "Oui" : "Non"}</div>
-                <div>Majoration urgence : {pricing.urgency ? "Oui" : "Non"}</div>
                 <div style={{ marginTop: 6 }}>
                   Prix final TTC : <b style={{ color: "var(--gold2)" }}>{pricing.priceFinalTTC} €</b>
                 </div>
@@ -314,8 +327,24 @@ export default function ClientRequestPage() {
           </label>
 
           <label className="field">
-            <div className="label">Passagers</div>
-            <input type="number" min="1" max="8" value={form.passengers} onChange={(e) => update("passengers", e.target.value)} />
+            <div className="label">Adultes</div>
+            <input
+              type="number"
+              min="0"
+              max="8"
+              value={form.adults}
+              onChange={(e) => update("adults", e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <div className="label">Enfants</div>
+            <input
+              type="number"
+              min="0"
+              max="8"
+              value={form.children}
+              onChange={(e) => update("children", e.target.value)}
+            />
           </label>
           <label className="field">
             <div className="label">Bagages</div>
@@ -359,17 +388,25 @@ export default function ClientRequestPage() {
             ) : null}
           </label>
 
-          <label className="field" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <input
-              type="checkbox"
-              checked={Boolean(form.urgency)}
-              onChange={(e) => update("urgency", e.target.checked)}
-              style={{ width: 18, height: 18, accentColor: "var(--gold2)" }}
-            />
-            <div>
-              <div className="label" style={{ marginTop: -2 }}>
-                Urgence (moins de 2h) +15%
-              </div>
+          <label className="field">
+            <div className="label">Équipements</div>
+            <div className="checksRow">
+              <label className="checkItem">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.babySeat)}
+                  onChange={(e) => update("babySeat", e.target.checked)}
+                />
+                <span>Siège bébé</span>
+              </label>
+              <label className="checkItem">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.booster)}
+                  onChange={(e) => update("booster", e.target.checked)}
+                />
+                <span>Rehausseur</span>
+              </label>
             </div>
           </label>
         </div>
