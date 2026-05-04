@@ -411,19 +411,31 @@ export default function ClientRequestPage() {
           </label>
         </div>
 
-        <div className="actions">
-          <button className="btn gold" disabled={!canReserve} onClick={handleReserveClick}>
-            Réserver maintenant
-          </button>
-          <button
-            className="btn ghost"
-            disabled={!canReserve || !quoteWaText}
-            onClick={() => {
-              window.open(waLink(COMPANY_WHATSAPP, quoteWaText), "_blank", "noreferrer");
-            }}
-          >
-            Recevoir le devis sur WhatsApp
-          </button>
+        <div className="actions" style={{ alignItems: "center", justifyContent: "space-between" }}>
+          <div className="muted" style={{ fontSize: 12 }}>
+            {pricing.ready ? (
+              <>
+                Prix actuel :{" "}
+                <b style={{ color: "var(--gold2)" }}>{pricing.priceFinalTTC} €</b>
+              </>
+            ) : (
+              "Complétez les informations pour voir le prix."
+            )}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <button className="btn gold" disabled={!canReserve} onClick={handleReserveClick}>
+              Réserver maintenant
+            </button>
+            <button
+              className="btn ghost"
+              disabled={!canReserve || !quoteWaText}
+              onClick={() => {
+                window.open(waLink(COMPANY_WHATSAPP, quoteWaText), "_blank", "noreferrer");
+              }}
+            >
+              Recevoir le devis sur WhatsApp
+            </button>
+          </div>
         </div>
 
         {submitted ? (
