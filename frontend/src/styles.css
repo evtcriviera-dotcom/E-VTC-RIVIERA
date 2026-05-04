@@ -183,15 +183,15 @@ a{color:inherit}
 input,select{
   width:100%;
   border-radius:14px;
-  border:1px solid rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.95);
   background: rgba(12,10,18,.75);
   color:var(--text);
   padding:12px 12px;
   outline:none;
 }
 input:focus,select:focus{
-  border-color: rgba(214,179,95,.55);
-  box-shadow: 0 0 0 4px rgba(214,179,95,.10);
+  border-color: rgba(255,255,255,1);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.15);
 }
 
 .actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}

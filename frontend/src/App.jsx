@@ -1,14 +1,11 @@
 import React from "react";
-import { NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import ClientRequestPage from "./pages/ClientRequestPage.jsx";
-import AdminPage from "./pages/AdminPage.jsx";
 import { waLink } from "./api.js";
 
 const COMPANY_WHATSAPP = "0780390730";
 
 function TopNav() {
-  const location = useLocation();
-  const isAdmin = location.pathname.startsWith("/admin");
   return (
     <header className="topbar">
       <div className="brand">
@@ -22,13 +19,6 @@ function TopNav() {
         <NavLink className={({ isActive }) => `tab ${isActive ? "active" : ""}`} to="/">
           Client
         </NavLink>
-        <NavLink
-          className={({ isActive }) => `tab ${isActive ? "active" : ""}`}
-          to="/admin"
-          aria-current={isAdmin ? "page" : undefined}
-        >
-          Admin
-        </NavLink>
       </nav>
     </header>
   );
@@ -41,7 +31,7 @@ export default function App() {
       <main className="container">
         <Routes>
           <Route path="/" element={<ClientRequestPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       <a
